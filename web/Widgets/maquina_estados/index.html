@@ -1,0 +1,325 @@
+﻿<!DOCTYPE html>
+<html style="overflow: hidden;">
+<head>
+    <script src="./custom_widget.js"></script>
+    <title>maquina_estados</title>
+</head>
+<body>
+	<script src="../resources/apis/proxy.js" cwidget="maquina_estados" autoResize="disable"></script>
+		
+	<script>	
+		var estado=0;   // 0 - espera  // 1 - alinhamento // 2 - carga   // 3 - fim  
+		
+		// alinhamento
+		var larg_trelica = 670;
+		var y_correto = (2350 - larg_trelica)/2;
+		var y_max=y_correto + 40;
+		var y_min=y_correto - 40;
+		
+		var lat_container=[];
+		var lengt_container=[];
+		var cont_container=0;
+		
+		var med_lat=0; // y
+		var med_lengt=0; // x
+		var SS_xy=0;
+		var SS_xx=0;
+		var a=0;
+		var b=0;
+		
+		// calculo
+		var Y0=0;
+		var y_saco=455;
+		var h_saco=170;
+		var x_saco=800;
+		var larg_trelica=670;
+		var L=885;
+		var h_trelica=255;
+		var Z0 = 0 ;// h_saco/2 + linha*h_saco;
+		var Z1= 558;
+		var teta=0;
+		var phi=0;
+		var Dx=0;
+		
+		var x_cont=0;
+		var z_cont=0;
+		var y_cont=0;
+		var dist_x=0;
+		
+		function inicio(){
+			if (Number(cwidget.dist_lado)<20){
+				cwidget.sensor_obstruido=1;
+			}
+			if (Number(cwidget.dist_frente)<20){
+				cwidget.sensor_obstruido=1;
+			}
+			if (Number(cwidget.dist_baixo)<20){
+				cwidget.sensor_obstruido=1;
+			}
+			//alert(cwidget.dist_baixo);
+			//if (Number(cwidget.)!=0){
+			//	var erro_modbus=1;
+			//}
+		}
+		//alert('ok');
+		//cwidget.on("semi_auto",function(){
+		//	if (Number(cwidget.semi_auto){
+		//		
+		//	}
+		//}
+		
+		cwidget.on("container", function() {
+			if (Number(cwidget.semi_auto)==0 && Number(cwidget.manual)==0 ){
+				if (Number(cwidget.container)){
+					if (Number(cwidget.dist_lado)< y_min || Number(cwidget.dist_frente)>y_max){
+						cwidget.container_pos_erro=1;
+					} else {
+						estado=1;
+						lengt_container=[];
+						lat_container=[];
+						cont_container=0;
+					}
+					
+				}else if (estado==3){
+					cwidget.Recolhe_trelica=0;
+					cwidget.start=0;
+					cwidget.container_pos_erro=0;
+					cwidget.n_sacos=0;
+					cwidget.Altura_trelica=0;
+					cwidget.Zera_coordenada=0;
+					cwidget.Penultimo_saco=0;
+					estado=0;
+					
+				}else{
+					cwidget.container_pos_erro=0;
+				}
+			}
+		});
+		
+		cwidget.on("start", function(){
+			if (Number(cwidget.start)){
+				if (Number(cwidget.semi_auto)==0 && Number(cwidget.manual)==0 && estado==1){
+					cwidget.Avanca_trelica=1;
+				}else if (Number(cwidget.semi_auto)==0 && Number(cwidget.manual)==0 && estado==2){
+					Calcular();
+					enviar();
+				}
+			}
+		});
+		
+		cwidget.on("Posicao_esteira", function(){
+			if (Number(cwidget.semi_auto)==0 && Number(cwidget.manual)==0 && estado==1){
+				lat_container[cont_container]=Number(cwidget.dist_lado);
+				lengt_container[cont_container]=Number(cwidget.Posicao_esteira);
+				cont_container++;
+			}
+		});
+		
+
+		
+		cwidget.on("Fim_mov_trelica",function(){
+			if (Number(cwidget.semi_auto)==0 && Number(cwidget.manual)==0 && Number(cwidget.Fim_mov_trelica)==1){
+				cwidget.Avanca_trelica=0;
+				estado=2;
+				med_lat=0;
+				med_lengt=0;
+				SS_xy=0;
+				SS_xx=0;
+				// n=cont_container
+				for(i = 0; i < cont_container ; i++) {
+					med_lat = med_lat + lat_container[i]; //
+					med_lengt = med_lengt + lengt_container[i];
+					
+					SS_xy = (lat_container[i] * lengt_container[i]) + SS_xy;
+					SS_xx = (lengt_container[i] * lengt_container[i]) + SS_xx;
+				}
+				med_lat = med_lat / cont_container;
+				med_lengt = med_lengt / cont_container;
+				SS_xy = SS_xy - cont_container * med_lat * med_lengt;
+				SS_xx = SS_xx - cont_container * med_lengt * med_lengt;
+				a = SS_xy / SS_xx;
+				b = med_lat - a * med_lengt;
+				
+				
+				
+				
+				if (b < y_min || b > y_max ||(a*(lengt_container[cont_container]+x_saco/0.31)+b) < y_min || (a*(lengt_container[cont_container]*x_saco/0.31)+b) > y_max){
+					cwidget.container_pos_erro=1;
+					cwidget.Recolhe_trelica=1;
+					cwidget.start=0;
+					estado=0;
+				}else{
+					cwidget.Alinhamento_container_ok=1;
+					cwidget.Zera_coordenada=1;
+					cwidget.n_sacos=0;
+					dist_x = Number(cwidget.dist_frente);
+					Calcular();
+				}
+			}
+		});
+		
+
+		
+		function Calcular() {
+			
+				x_cont = Math.trunc(Number(cwidget.n_sacos)/(5*14)); // de 0 a 6 logo = 7 
+				z_cont = Math.trunc(Number(cwidget.n_sacos)/5) - 14*x_cont; // de 0 a 13 logo = 14
+
+				
+				// if (z_cont % 2){
+				 	y_cont = Number(cwidget.n_sacos) - z_cont*5 - x_cont*5*14;  
+				// }
+				// else{
+				// 	y_cont = 4 -(Number(cwidget.n_sacos) - z_cont*5 - x_cont*5*14);
+				// }
+				
+						if (z_cont % 4 ==0){ //linha impar // 12543
+							if (y_cont<=1){
+								//
+							}else{
+								y_cont=6-y_cont;
+							}
+						}
+						else if (z_cont % 4 ==1){ //linha impar // 54123
+							if (y_cont<=2){
+								y_cont=y_cont+2;
+							}else{
+								y_cont=3-y_cont;
+							}
+						}
+						else if (y_cont % 4 ==2){ //linha par // 34521
+							if (y_cont<=1){
+								y_cont=4-y_cont;
+							}else{
+								y_cont=y_cont-2;
+							}
+						}
+						else if (z_cont % 4 ==3) { //linha par // 32145
+							if (y_cont<=2){
+								y_cont=2-y_cont;
+							}else{
+								//
+							}
+						}
+
+
+				//Y0 = y_med(6-x_cont) - (y_cont+0.5)*y_saco + larg_trelica/2
+				if (a >= 0) {																//h_trelica
+					Y0 = a * (lengt_container[cont_container] - x_cont*x_saco/0.31 ) + b + larg_trelica/2 - (y_cont + 0.5)*y_saco;
+				}else{
+					Y0 = a * (lengt_container[cont_container] +(1 - x_cont)*x_saco/0.31) + b + larg_trelica/2 - (y_cont + 0.5)*y_saco;
+				}
+				
+				Z0 = h_saco/2 + z_cont*h_saco;
+				
+				if ((Z0-Z1-Number(cwidget.dist_baixo)-h_trelica)/L < -0.4){
+					teta = -21;
+				}
+				else{
+					teta= Math.asin((Z0-Z1-Number(cwidget.dist_baixo)-h_trelica)/L);
+					teta = (teta*180)/Math.PI;
+				}
+
+				if (teta < -21){
+					teta = -21;
+				}
+				else if (teta>11){
+					teta=11;
+				}
+				
+				phi=Math.asin( (Y0) / (204+160+L*Math.cos((teta/180)*Math.PI)));
+                
+				if ((phi>0.79 || phi<-0.79) && teta<=-8){
+					teta=-8;
+					phi = Math.asin( (Y0) / (204+160+L*Math.cos((teta/180) *Math.PI)) );
+				}
+				
+				Dx= 204+160 +  L * Math.cos( (27/180) * Math.PI ) - (204+160 + L *(2*Math.cos( (teta/180) * Math.PI ) - Math.cos( (27/180) * Math.PI)))*Math.cos(phi);
+				Dx = dist_x + 100 + Dx;
+				
+				while (Dx > 1400){
+					teta=teta+0.1;
+					phi = Math.asin( (Y0) / (204+160+L*Math.cos((teta/180) *Math.PI)) ) ;
+					Dx = 204+160 +  L * Math.cos( (27/180) * Math.PI ) - (204+160 + L *(2*Math.cos( (teta/180) * Math.PI ) - Math.cos( (27/180) * Math.PI)))*Math.cos(phi);
+					Dx = dist_x + 100 + Dx;
+					if (teta>=-11){
+						break;
+						alert('Erro de calculo - Dx>1400 e teta > -11');
+					}
+				}
+				if (Number(cwidget.n_sacos)==488){
+					cwidget.Penultimo_saco=1;
+				}
+				
+				
+				
+				phi = (phi*180)/Math.PI;
+                //
+				cwidget.teta = (-211/38)*(teta-11);
+                //
+				cwidget.phi = phi*1000/3;;
+				
+				cwidget.phi2= phi*80*2500/(4*360);
+				//
+				cwidget.car = Dx * 15.714;
+				
+				cwidget.trel = x_cont * x_saco /0.31;
+
+		}		
+		
+		cwidget.on("mao", function() {
+			if (Number(cwidget.start)){
+				enviar();
+				}
+			
+			if (Number(cwidget.mao)==0){
+				cwidget.Inicia_movimento=0;
+			}
+		});
+		
+		function enviar(){
+			if (Number(cwidget.semi_auto)==0 && Number(cwidget.manual)==0 && estado==2){
+				if (Number(cwidget.mao)){
+					if (Number(cwidget.Inicia_movimento)==0){
+						if (z_cont>=6 ){ //&& Number(cwidget.Altura_trelica)==0
+							cwidget.Altura_trelica=1;					
+						}else if (z_cont<6({ // && Number(cwidget.Altura_trelica)==1){
+							cwidget.Altura_trelica=0;
+							cwidget.Posicao_trelica_final=cwidget.trel;
+						}
+						cwidget.Posicao_carrinho_final = cwidget.car;
+						cwidget.Posicao_lat_bra_phi_final = cwidget.phi;
+						cwidget.Posicao_lat_bra_phi_final2 = cwidget.phi2;
+						cwidget.Posicao_ver_bra_teta_final = cwidget.teta;
+						cwidget.Inicia_movimento=1;
+						cwidget.n_sacos = Number(cwidget.n_sacos)+1;
+					}
+				}else{
+					cwidget.Inicia_movimento=0;
+					if (Number(cwidget.n_sacos)<490) {
+						Calcular();
+					}else{
+						estado=3;
+						cwidget.Recolhe_trelica=1;
+				
+					}
+				}
+			}
+		}
+		
+		
+		
+		
+		
+		
+	</script>	
+		
+	<script>
+		setTimeout(function(){ 
+			inicio();
+		
+		}, 4000);
+
+	</script>
+</body>
+</html>
