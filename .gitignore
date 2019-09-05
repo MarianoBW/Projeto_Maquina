@@ -1,3 +1,6 @@
 
 
 *.dmp
+web/Dump/Dump.txt
+web/Dump/desktop.ini
+web/Dump/MemoryLog.csv
